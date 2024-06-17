@@ -1,2 +1,22 @@
 config:
   azure-native:location: North Europe
+  prefix:
+    type: string
+    description: User can define a suitable prefix for certain resources
+    default: devops
+  counter:
+    type: integer
+    description: A possibility to define how many resources will de deployed at once
+    default: 3
+  username:
+    type: string
+    description: Admin account username
+    default: azureuser
+  vm_size:
+    type: string
+    description: Size for the creatable VM
+    default: Standard_B1s
+  disk_size:
+    type: integer
+    description: Managed disk size gigabytes
+    default: 5
