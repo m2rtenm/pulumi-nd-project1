@@ -12,6 +12,9 @@ config:
     type: string
     description: Admin account username
     default: azureuser
+  password:
+    description: Admin account password
+    secret: true
   vm_size:
     type: string
     description: Size for the creatable VM

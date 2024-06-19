@@ -4,6 +4,7 @@ import pulumi
 from pulumi_azure_native import network
 from pulumi_azure_native import resources
 from pulumi_azure_native import compute
+import base64
 
 # Config and variables
 config = pulumi.Config()
@@ -14,6 +15,7 @@ counter = config.get_int("counter")
 username = config.get("username")
 vm_size = config.get("vm_size")
 disk_size = config.get_int("disk_size")
+password = config.require("password")
 
 # Resource group
 resource_group = resources.ResourceGroup(
@@ -67,3 +69,110 @@ nsg = network.NetworkSecurityGroup(
     ]
 )
 
+# Public IP
+public_ip = network.PublicIPAddress(
+    resource_name=f"{prefix}-PublicIP",
+    resource_group_name=resource_group.name,
+    location=resource_group.location,
+    public_ip_allocation_method=network.IpAllocationMethod.STATIC
+)
+
+# Backend Address Pool for the Load Balancer
+backend_pool = network.LoadBalancerBackendAddressPool(
+    resource_name=f"{prefix}-BackendPool",
+    resource_group_name=resource_group.name,
+    load_balancer_name=f"{prefix}-lb"
+)
+
+# Load Balancer and its configuration
+lb_frontend_ip = network.FrontendIPConfigurationArgs(
+    name=f"{prefix}-LB-PublicIPAddress",
+    public_ip_address=network.PublicIPAddressArgs(id=public_ip.id)
+)
+
+load_balancer = network.LoadBalancer(
+    resource_name=f"{prefix}-lb",
+    resource_group_name=resource_group.name,
+    load_balancer_name="lb",
+    location=resource_group.location,
+    frontend_ip_configurations=[lb_frontend_ip],
+    backend_address_pools=[network.BackendAddressPoolArgs(id=backend_pool.id)]
+)
+
+# VM Availability Set
+aset = compute.AvailabilitySet(
+    resource_name=f"{prefix}-AvailabilitySet",
+    resource_group_name=resource_group.name,
+    location=resource_group.location
+)
+
+# Virtual Machines, Network Interfaces and Managed Disks
+for i in range(counter):
+    vm_name = f"{prefix}-vm-{i+1}"
+
+    init_script = """#!/bin/bash
+    echo "Hello, world!" > index.html
+    nohup busybox httpd -f -p 80 &
+    """
+
+    disk = compute.Disk(
+        resource_name=f"{prefix}-ManagedDisk-{i+1}",
+        resource_group_name=resource_group.name,
+        location=resource_group.location,
+        disk_size_gb=disk_size,
+        creation_data=compute.CreationDataArgs(create_option=compute.DiskCreateOptionTypes.EMPTY),
+        sku=compute.DiskSkuArgs(name="Standard_LRS")
+    )
+
+    nic = network.NetworkInterface(
+        resource_name=f"{prefix}-nic-{i+1}",
+        resource_group_name=resource_group.name,
+        location=resource_group.location,
+        ip_configurations=[network.NetworkInterfaceIPConfigurationArgs(
+            name="internal",
+            subnet=network.SubnetArgs(id=subnet.id),
+            private_ip_allocation_method=network.IpAllocationMethod.DYNAMIC,
+            load_balancer_backend_address_pools=[network.BackendAddressPoolArgs(id=backend_pool.id)]
+        )],
+        network_security_group=network.NetworkSecurityGroupArgs(id=nsg.id)
+    )
+
+    vm = compute.VirtualMachine(
+        resource_name=vm_name,
+        resource_group_name=resource_group.name,
+        location=resource_group.location,
+
+        hardware_profile=compute.HardwareProfileArgs(vm_size=vm_size),
+
+        network_profile=compute.NetworkProfileArgs(
+            network_interfaces=[
+                compute.NetworkInterfaceReferenceArgs(id=nic.id)
+            ]
+        ),
+
+        os_profile=compute.OSProfileArgs(
+            computer_name=vm_name,
+            admin_username=username,
+            admin_password=password,
+            custom_data=base64.b64encode(init_script.encode("ascii")).decode("ascii"),
+            linux_configuration=compute.LinuxConfigurationArgs(
+                disable_password_authentication=False
+            )
+        ),
+
+        availability_set=compute.SubResourceArgs(id=aset.id),
+
+        storage_profile=compute.StorageProfileArgs(
+            os_disk=compute.OSDiskArgs(
+                caching=compute.CachingTypes.READ_WRITE,
+                create_option=compute.DiskCreateOptionTypes.FROM_IMAGE,
+                managed_disk=compute.ManagedDiskParametersArgs(id=disk.id)
+            ),
+            image_reference=compute.ImageReferenceArgs(
+                publisher="canonical",
+                offer="UbuntuServer",
+                sku="18.04-LTS",
+                version="latest"
+            )
+        )
+    )
