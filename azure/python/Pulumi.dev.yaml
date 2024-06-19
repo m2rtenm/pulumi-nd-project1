@@ -8,7 +8,7 @@ config:
   azure-python:counter: "3"
   azure-python:disk_size: "5"
   azure-python:password:
-    secure: AAABADFSo2tI5SmYxZgLyWa5vePe4oiOXgk1FdzFdcveI9Q7QFi0Vw==
+    secure: AAABABsH264ZzeVouNBFhcuWdVLwdoxhYVkBymr8MjCr3RA6GGVS0i9p
   azure-python:prefix: devops
   azure-python:username: azureuser
   azure-python:vm_size: Standard_B1s

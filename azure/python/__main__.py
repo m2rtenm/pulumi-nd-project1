@@ -173,7 +173,7 @@ for i in range(counter):
             os_disk=compute.OSDiskArgs(
                 caching=compute.CachingTypes.READ_WRITE,
                 create_option=compute.DiskCreateOptionTypes.FROM_IMAGE,
-                managed_disk=compute.ManagedDiskParametersArgs(id=disk.id)
+                managed_disk=compute.ManagedDiskParametersArgs(storage_account_type="Standard_LRS")
             ),
             image_reference=compute.ImageReferenceArgs(
                 publisher="canonical",
