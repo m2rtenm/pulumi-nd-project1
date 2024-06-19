@@ -1,24 +1,19 @@
 config:
   azure-native:location: North Europe
-  azure-python:counter:
+  counter:
     default: 3
     description: A possibility to define how many resources will de deployed at once
-    type: integer
-  azure-python:disk_size:
+  disk_size:
     default: 5
     description: Managed disk size gigabytes
-    type: integer
-  azure-python:password:
+  password:
     secure: AAABADFSo2tI5SmYxZgLyWa5vePe4oiOXgk1FdzFdcveI9Q7QFi0Vw==
-  azure-python:prefix:
+  prefix:
     default: devops
     description: User can define a suitable prefix for certain resources
-    type: string
-  azure-python:username:
+  username:
     default: azureuser
     description: Admin account username
-    type: string
-  azure-python:vm_size:
+  vm_size:
     default: Standard_B1s
     description: Size for the creatable VM
-    type: string
