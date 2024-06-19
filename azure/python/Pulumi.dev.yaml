@@ -1,19 +1,14 @@
 config:
+  azure-native:clientId: e6fcf53e-e5c2-4795-9ec1-98897b227f1b
+  azure-native:clientSecret:
+    secure: AAABAK5vVe4FxWNPt1xnmflhjhfqfFMh6sgeG6ic+Rr3MUxicTQKVyH6nb0VEXI3b3gHPue0dyGTBB8C+3N7ZcJBNJzOH48W
   azure-native:location: North Europe
-  counter:
-    default: 3
-    description: A possibility to define how many resources will de deployed at once
-  disk_size:
-    default: 5
-    description: Managed disk size gigabytes
-  password:
+  azure-native:subscriptionId: 786afefa-8a1f-4acd-9232-46099effd9ea
+  azure-native:tenantId: 35ca09bb-e758-4cad-b2ae-92a3d05592cc
+  azure-python:counter: "3"
+  azure-python:disk_size: "5"
+  azure-python:password:
     secure: AAABADFSo2tI5SmYxZgLyWa5vePe4oiOXgk1FdzFdcveI9Q7QFi0Vw==
-  prefix:
-    default: devops
-    description: User can define a suitable prefix for certain resources
-  username:
-    default: azureuser
-    description: Admin account username
-  vm_size:
-    default: Standard_B1s
-    description: Size for the creatable VM
+  azure-python:prefix: devops
+  azure-python:username: azureuser
+  azure-python:vm_size: Standard_B1s

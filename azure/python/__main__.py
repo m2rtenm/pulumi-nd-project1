@@ -4,6 +4,7 @@ import pulumi
 from pulumi_azure_native import network
 from pulumi_azure_native import resources
 from pulumi_azure_native import compute
+from pulumi import ResourceOptions
 import base64
 
 # Config and variables
@@ -26,7 +27,8 @@ resource_group = resources.ResourceGroup(
 # Virtual network
 virtual_network = network.VirtualNetwork(
     resource_name=f"{prefix}-network",
-    address_spaces=network.AddressSpaceArgs(
+    resource_group_name=resource_group.name,
+    address_space=network.AddressSpaceArgs(
         address_prefixes=["10.0.0.0/16"]
     )
 )
@@ -50,9 +52,9 @@ nsg = network.NetworkSecurityGroup(
             direction=network.SecurityRuleDirection.INBOUND,
             access=network.SecurityRuleAccess.ALLOW,
             protocol=network.SecurityRuleProtocol.TCP,
-            source_address_prefix=[subnet.address_prefixes[0]],
+            source_address_prefix=subnet.address_prefixes[0],
             source_port_range="*",
-            destination_address_prefix=[subnet.address_prefixes[0]],
+            destination_address_prefix=subnet.address_prefixes[0],
             destination_port_range="*"
         ),
         network.SecurityRuleArgs(
@@ -74,14 +76,8 @@ public_ip = network.PublicIPAddress(
     resource_name=f"{prefix}-PublicIP",
     resource_group_name=resource_group.name,
     location=resource_group.location,
-    public_ip_allocation_method=network.IpAllocationMethod.STATIC
-)
-
-# Backend Address Pool for the Load Balancer
-backend_pool = network.LoadBalancerBackendAddressPool(
-    resource_name=f"{prefix}-BackendPool",
-    resource_group_name=resource_group.name,
-    load_balancer_name=f"{prefix}-lb"
+    public_ip_allocation_method=network.IpAllocationMethod.STATIC,
+    sku=network.PublicIPAddressSkuArgs(name=network.PublicIPAddressSkuName.STANDARD)
 )
 
 # Load Balancer and its configuration
@@ -96,14 +92,25 @@ load_balancer = network.LoadBalancer(
     load_balancer_name="lb",
     location=resource_group.location,
     frontend_ip_configurations=[lb_frontend_ip],
-    backend_address_pools=[network.BackendAddressPoolArgs(id=backend_pool.id)]
+    sku=network.LoadBalancerSkuArgs(name=network.LoadBalancerSkuName.STANDARD)
+)
+
+# Backend Address Pool for the Load Balancer
+backend_pool = network.LoadBalancerBackendAddressPool(
+    resource_name=f"{prefix}-BackendPool",
+    resource_group_name=resource_group.name,
+    load_balancer_name=load_balancer.name,
+
+    opts=ResourceOptions(depends_on=[load_balancer])
 )
 
 # VM Availability Set
 aset = compute.AvailabilitySet(
     resource_name=f"{prefix}-AvailabilitySet",
     resource_group_name=resource_group.name,
-    location=resource_group.location
+    location=resource_group.location,
+    sku=compute.SkuArgs(name="Aligned"),
+    platform_fault_domain_count=2
 )
 
 # Virtual Machines, Network Interfaces and Managed Disks
