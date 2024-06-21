@@ -7,8 +7,4 @@ config:
   azure-native:tenantId: 35ca09bb-e758-4cad-b2ae-92a3d05592cc
   azure-yaml:password:
     secure: AAABAG03N0/SIcom82awVmetVSYr7jkJmUOYYqgp1mRukLiem9aQINEV
-  azure-yaml:prefix: devops
-  azure-yaml:counter: 3
-  azure-yaml:disk_size: 5
-  azure-yaml:username: azureuser
-  azure-yaml:vm_size: Standard_B1s
+

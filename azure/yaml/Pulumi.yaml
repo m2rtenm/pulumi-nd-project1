@@ -7,16 +7,16 @@ config:
       pulumi:template: azure-yaml
 variables:
   location: ${azure-native:location}
-  prefix: ${azure-yaml:prefix}
-  counter: ${azure-yaml:counter}
-  username: ${azure-yaml:username}
+  prefix: devops
+  username: azureuser
   password: ${azure-yaml:password}
-  vm_size: ${azure-yaml:vm_size}
-  disk_size: ${azure-yaml:disk_size}
-  init_script: |
-    #!/bin/bash
-    echo "hello, world" > index.html
-    nohup busybox httpd -f -p 80 &
+  vm_size: Standard_B1s
+  disk_size: 5
+  init_script: 
+    fn::toBase64: |
+        #!/bin/bash
+        echo "hello, world" > index.html
+        nohup busybox httpd -f -p 80 &
   
 resources:
   resourceGroup:
@@ -105,3 +105,198 @@ resources:
       sku:
         name: Aligned
       platformFaultDomainCount: 2
+  
+  managedDisk_1:
+    type: azure-native:compute:Disk
+    properties:
+      diskName: ${prefix}-ManagedDisk-1
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      creationData:
+        createOption: Empty
+      diskSizeGB: ${disk_size}
+      sku:
+        name: Standard_LRS
+
+  managedDisk_2:
+    type: azure-native:compute:Disk
+    properties:
+      diskName: ${prefix}-ManagedDisk-2
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      creationData:
+        createOption: Empty
+      diskSizeGB: ${disk_size}
+      sku:
+        name: Standard_LRS
+
+  managedDisk_3:
+    type: azure-native:compute:Disk
+    properties:
+      diskName: ${prefix}-ManagedDisk-3
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      creationData:
+        createOption: Empty
+      diskSizeGB: ${disk_size}
+      sku:
+        name: Standard_LRS
+  
+  networkInterface_1:
+    type: azure-native:network:NetworkInterface
+    properties:
+      networkInterfaceName: ${prefix}-nic-1
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      ipConfigurations:
+        - name: internal
+          subnet:
+            id: ${subnet.id}
+          privateIPAllocationMethod: Dynamic
+          loadBalancerBackendAddressPools:
+            - id: ${backendPool.id}
+      networkSecurityGroup:
+        id: ${networkSecurityGroup.id}
+
+  networkInterface_2:
+    type: azure-native:network:NetworkInterface
+    properties:
+      networkInterfaceName: ${prefix}-nic-2
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      ipConfigurations:
+        - name: internal
+          subnet:
+            id: ${subnet.id}
+          privateIPAllocationMethod: Dynamic
+          loadBalancerBackendAddressPools:
+            - id: ${backendPool.id}
+      networkSecurityGroup:
+        id: ${networkSecurityGroup.id}
+
+  networkInterface_3:
+    type: azure-native:network:NetworkInterface
+    properties:
+      networkInterfaceName: ${prefix}-nic-3
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      ipConfigurations:
+        - name: internal
+          subnet:
+            id: ${subnet.id}
+          privateIPAllocationMethod: Dynamic
+          loadBalancerBackendAddressPools:
+            - id: ${backendPool.id}
+      networkSecurityGroup:
+        id: ${networkSecurityGroup.id}
+  
+  vm_1:
+    type: azure-native:compute:VirtualMachine
+    properties:
+      vmName: ${prefix}-vm-1
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+
+      hardwareProfile:
+        vmSize: ${vm_size}
+      
+      networkProfile:
+        networkInterfaces:
+          - id: ${networkInterface_1.id}
+      
+      osProfile:
+        adminUsername: ${username}
+        adminPassword: ${password}
+        computerName: ${prefix}-vm-1
+        customData: ${init_script}
+        linuxConfiguration:
+          disablePasswordAuthentication: false
+      
+      availabilitySet:
+        id: ${availabilitySet.id}
+      
+      storageProfile:
+        osDisk:
+          caching: ReadWrite
+          createOption: FromImage
+          managedDisk:
+            storageAccountType: Standard_LRS
+        imageReference:
+          publisher: canonical
+          offer: UbuntuServer
+          sku: 18.04-LTS
+          version: latest
+
+  vm_2:
+    type: azure-native:compute:VirtualMachine
+    properties:
+      vmName: ${prefix}-vm-2
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+
+      hardwareProfile:
+        vmSize: ${vm_size}
+      
+      networkProfile:
+        networkInterfaces:
+          - id: ${networkInterface_2.id}
+      
+      osProfile:
+        adminUsername: ${username}
+        adminPassword: ${password}
+        computerName: ${prefix}-vm-2
+        customData: ${init_script}
+        linuxConfiguration:
+          disablePasswordAuthentication: false
+      
+      availabilitySet:
+        id: ${availabilitySet.id}
+      
+      storageProfile:
+        osDisk:
+          caching: ReadWrite
+          createOption: FromImage
+          managedDisk:
+            storageAccountType: Standard_LRS
+        imageReference:
+          publisher: canonical
+          offer: UbuntuServer
+          sku: 18.04-LTS
+          version: latest
+
+  vm_3:
+    type: azure-native:compute:VirtualMachine
+    properties:
+      vmName: ${prefix}-vm-3
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+
+      hardwareProfile:
+        vmSize: ${vm_size}
+      
+      networkProfile:
+        networkInterfaces:
+          - id: ${networkInterface_3.id}
+      
+      osProfile:
+        adminUsername: ${username}
+        adminPassword: ${password}
+        computerName: ${prefix}-vm-3
+        customData: ${init_script}
+        linuxConfiguration:
+          disablePasswordAuthentication: false
+      
+      availabilitySet:
+        id: ${availabilitySet.id}
+      
+      storageProfile:
+        osDisk:
+          caching: ReadWrite
+          createOption: FromImage
+          managedDisk:
+            storageAccountType: Standard_LRS
+        imageReference:
+          publisher: canonical
+          offer: UbuntuServer
+          sku: 18.04-LTS
+          version: latest
