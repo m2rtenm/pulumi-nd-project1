@@ -5,23 +5,103 @@ config:
   pulumi:tags:
     value:
       pulumi:template: azure-yaml
-outputs:
-  # Export the primary key of the Storage Account
-  primaryStorageKey: ${storageAccountKeys.keys[0].value}
+variables:
+  location: ${azure-native:location}
+  prefix: ${azure-yaml:prefix}
+  counter: ${azure-yaml:counter}
+  username: ${azure-yaml:username}
+  password: ${azure-yaml:password}
+  vm_size: ${azure-yaml:vm_size}
+  disk_size: ${azure-yaml:disk_size}
+  init_script: |
+    #!/bin/bash
+    echo "hello, world" > index.html
+    nohup busybox httpd -f -p 80 &
+  
 resources:
-  # Create an Azure Resource Group
   resourceGroup:
     type: azure-native:resources:ResourceGroup
-  # Create an Azure resource (Storage Account)
-  sa:
     properties:
-      kind: StorageV2
+      location: ${location}
+      resourceGroupName: ${prefix}-ResourceGroup
+  virtualNetwork:
+    type: azure-native:network:VirtualNetwork
+    properties:
+      virtualNetworkName: ${prefix}-Network
       resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      addressSpace:
+        addressPrefixes:
+          - 10.0.0.0/16
+  subnet:
+    type: azure-native:network:Subnet
+    properties:
+      subnetName: internal
+      resourceGroupName: ${resourceGroup.name}
+      virtualNetworkName: ${virtualNetwork.name}
+      addressPrefixes:
+        - 10.0.0.0/24
+  networkSecurityGroup:
+    type: azure-native:network:NetworkSecurityGroup
+    properties:
+      networkSecurityGroupName: ${prefix}-nsg
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      securityRules:
+        - name: AllowInternalTraffic
+          priority: 100
+          direction: Inbound
+          access: Allow
+          protocol: Tcp
+          sourceAddressPrefix: ${subnet.addressPrefixes[0]}
+          sourcePortRange: "*"
+          destinationAddressPrefix: ${subnet.addressPrefixes[0]}
+          destinationPortRange: "*"
+        - name: DenyInternetInbound
+          priority: 200
+          direction: Inbound
+          access: Deny
+          protocol: Tcp
+          sourceAddressPrefix: Internet
+          sourcePortRange: "*"
+          destinationAddressPrefix: "*"
+          destinationPortRange: "*"
+  publicIP:
+    type: azure-native:network:PublicIPAddress
+    properties:
+      publicIpAddressName: ${prefix}-PublicIP
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      publicIPAllocationMethod: Static
       sku:
-        name: Standard_LRS
-    type: azure-native:storage:StorageAccount
-variables:
-  storageAccountKeys:
-    fn::azure-native:storage:listStorageAccountKeys:
-      accountName: ${sa.name}
+        name: Standard
+  loadBalancer:
+    type: azure-native:network:LoadBalancer
+    properties:
+      loadBalancerName: ${prefix}-lb
       resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      frontendIPConfigurations:
+        - name: ${prefix}-LB-PublicIPAddress
+          publicIPAddress: 
+            id: ${publicIP.id}
+      sku:
+        name: Standard
+  backendPool:
+    type: azure-native:network:LoadBalancerBackendAddressPool
+    properties:
+      backendAddressPoolName: ${prefix}-BackendPool
+      resourceGroupName: ${resourceGroup.name}
+      loadBalancerName: ${loadBalancer.name}
+    options:
+      dependsOn:
+        - ${loadBalancer}
+  availabilitySet:
+    type: azure-native:compute:AvailabilitySet
+    properties:
+      availabilitySetName: ${prefix}-AvailabilitySet
+      resourceGroupName: ${resourceGroup.name}
+      location: ${resourceGroup.location}
+      sku:
+        name: Aligned
+      platformFaultDomainCount: 2
