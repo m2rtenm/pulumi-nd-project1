@@ -120,3 +120,51 @@ private_route_2_assoc = aws.ec2.RouteTableAssociation(
     subnet_id=private_subnet_2.id
 )
 
+# Security groups
+
+# ALB Security Group (Internet Traffic -> ALB)
+lb_sg = aws.ec2.SecurityGroup(
+    resource_name=f"{prefix}-lb-SecurityGroup",
+    description="Controls access to the ALB",
+    vpc_id=vpc.id,
+    ingress=[aws.ec2.SecurityGroupArgs(
+        from_port=80,
+        to_port=80,
+        protocol="Tcp",
+        cidr_blocks=["0.0.0.0/0"]
+    )],
+    egress=[aws.ec2.SecurityGroupEgressArgs(
+        from_port=0,
+        to_port=0,
+        protocol="-1",
+        cidr_blocks=["0.0.0.0/0"]
+    )]
+)
+
+# Instance Security Group (ALB traffic -> EC2, ssh -> EC2)
+ec2_sg = aws.ec2.SecurityGroup(
+    resource_name=f"{prefix}-ec2-SecurityGroup",
+    description="Allows inbound access from the ALB only",
+    vpc_id=vpc.id,
+    ingress=[
+        aws.ec2.SecurityGroupIngressArgs(
+            from_port=0,
+            to_port=0,
+            protocol="-1",
+            security_groups=[lb_sg.id]
+        ),
+        aws.ec2.SecurityGroupIngressArgs(
+            from_port=22,
+            to_port=22,
+            protocol="Tcp",
+            cidr_blocks=["0.0.0.0/0"]
+        )
+    ],
+    egress=[aws.ec2.SecurityGroupEgressArgs(
+        from_port=0,
+        to_port=0,
+        protocol="-1",
+        cidr_blocks=["0.0.0.0/0"]
+    )]
+)
+
