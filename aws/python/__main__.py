@@ -2,6 +2,7 @@
 
 import pulumi
 import pulumi_aws as aws
+import pulumi_tls as tls
 
 config = pulumi.Config()
 region = aws.config.region
@@ -168,3 +169,15 @@ ec2_sg = aws.ec2.SecurityGroup(
     )]
 )
 
+# Key pair for EC2
+rsa_key = tls.PrivateKey(
+    resource_name="rsa-key",
+    algorithm="RSA",
+    rsa_bits=4096
+)
+
+keypair = aws.ec2.KeyPair(
+    resource_name=f"{prefix}-KeyPair",
+    key_name=f"{prefix}-EC2-KeyPair",
+    public_key=rsa_key.public_key_openssh
+)
