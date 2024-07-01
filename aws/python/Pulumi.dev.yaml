@@ -1,6 +1,5 @@
 config:
   aws:region: eu-north-1
-  instance_type: t3.micro
   autoscale_min: 3
   autoscale_max: 5
   autoscale_desired: 4
