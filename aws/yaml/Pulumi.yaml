@@ -5,10 +5,267 @@ config:
   pulumi:tags:
     value:
       pulumi:template: aws-yaml
-outputs:
-  # Export the name of the bucket
-  bucketName: ${my-bucket.id}
+variables:
+  prefix: devops
+  autoscaleMin: 3
+  autoscaleMax: 5
+  autoscaleDesired: 4
+  az:
+    - eu-north-1a
+    - eu-north-1b
+    - eu-north-1c
+  initScript: |
+    #!/bin/bash -xe
+    sudo apt update -y
+    sudo apt -y install docker
+    sudo service docker start
+    sudo usermod -a -G docker ec2-user
+    sudo chmod 666 /var/run/docker.sock
+    docker pull nginx
+    docker tag nginx my-nginx
+    docker run --rm --name nginx-server -d -p 80:80 -t my-nginx
+  ubuntuAmi: ami-0705384c0b33c194c
 resources:
-  # Create an AWS resource (S3 Bucket)
-  my-bucket:
-    type: aws:s3:Bucket
+  vpc:
+    type: aws:ec2:Vpc
+    properties:
+      cidrBlock: 10.0.0.0/16
+      enableDnsSupport: true
+      enableDnsHostnames: true
+  
+  publicSubnet1:
+    type: aws:ec2:Subnet
+    properties:
+      vpcId: ${vpc.id}
+      cidrBlock: 10.0.1.0/24
+      availabilityZone: ${az[0]}
+
+  publicSubnet2:
+    type: aws:ec2:Subnet
+    properties:
+      vpcId: ${vpc.id}
+      cidrBlock: 10.0.2.0/24
+      availabilityZone: ${az[1]}
+  
+  privateSubnet1:
+    type: aws:ec2:Subnet
+    properties:
+      vpcId: ${vpc.id}
+      cidrBlock: 10.0.3.0/24
+      availabilityZone: ${az[0]}
+  
+  privateSubnet2:
+    type: aws:ec2:Subnet
+    properties:
+      vpcId: ${vpc.id}
+      cidrBlock: 10.0.4.0/24
+      availabilityZone: ${az[1]}
+  
+  igw:
+    type: aws:ec2:InternetGateway
+    properties:
+      vpcId: ${vpc.id}
+  
+  elasticIp:
+    type: aws:ec2:Eip
+    properties:
+      domain: vpc
+      associateWithPrivateIp: 10.0.0.5
+    options:
+      dependsOn:
+        - ${igw}
+  
+  ngw:
+    type: aws:ec2:NatGateway
+    properties:
+      allocationId: ${elasticIp.id}
+      subnetId: ${publicSubnet1.id}
+    options:
+      dependsOn:
+        - ${elasticIp}
+  
+  publicRouteTable:
+    type: aws:ec2:RouteTable
+    properties:
+      vpcId: ${vpc.id}
+
+  privateRouteTable:
+    type: aws:ec2:RouteTable
+    properties:
+      vpcId: ${vpc.id}
+  
+  publicInternetIgwRoute:
+    type: aws:ec2:Route
+    properties:
+      routeTableId: ${publicRouteTable.id}
+      gatewayId: ${igw.id}
+      destinationCidrBlock: 0.0.0.0/0
+  
+  natNgwRoute:
+    type: aws:ec2:Route
+    properties:
+      routeTableId: ${privateRouteTable.id}
+      natGatewayId: ${ngw.id}
+      destinationCidrBlock: 0.0.0.0/0
+  
+  publicRouteAssoc1:
+    type: aws:ec2:RouteTableAssociation
+    properties:
+      routeTableId: ${publicRouteTable.id}
+      subnetId: ${publicSubnet1.id}
+  
+  publicRouteAssoc2:
+    type: aws:ec2:RouteTableAssociation
+    properties:
+      routeTableId: ${publicRouteTable.id}
+      subnetId: ${publicSubnet2.id}
+  
+  privateRouteAssoc1:
+    type: aws:ec2:RouteTableAssociation
+    properties:
+      routeTableId: ${privateRouteTable.id}
+      subnetId: ${privateSubnet1.id}
+  
+  privateRouteAssoc2:
+    type: aws:ec2:RouteTableAssociation
+    properties:
+      routeTableId: ${privateRouteTable.id}
+      subnetId: ${privateSubnet2.id}
+  
+  albSecurityGroup:
+    type: aws:ec2:SecurityGroup
+    properties:
+      description: Controls access to the ALB
+      vpcId: ${vpc.id}
+      ingress:
+        - fromPort: 80
+          toPort: 80
+          protocol: Tcp
+          cidrBlocks:
+            - 0.0.0.0/0
+      egress:
+        - fromPort: 0
+          toPort: 0
+          protocol: -1
+          cidrBlocks:
+            - 0.0.0.0/0
+  
+  ec2SecurityGroup:
+    type: aws:ec2:SecurityGroup
+    properties:
+      description: Allows inbound access from the ALB only
+      vpcId: ${vpc.id}
+      ingress:
+        - fromPort: 0
+          toPort: 0
+          protocol: -1
+          securityGroups:
+            - ${albSecurityGroup.id}
+        - fromPort: 22
+          toPort: 22
+          protocol: Tcp
+          cidrBlocks:
+            - 0.0.0.0/0
+      egress:
+        - fromPort: 0
+          toPort: 0
+          protocol: -1
+          cidrBlocks:
+            - 0.0.0.0/0
+  
+  rsaKey:
+    type: tls:PrivateKey
+    properties:
+      algorithm: RSA
+      rsaBits: 4096
+  
+  keypair:
+    type: aws:ec2:KeyPair
+    properties:
+      keyName: ${prefix}-EC2-KeyPair
+      publicKey: ${rsaKey.publicKeyOpenssh}
+  
+  bastion:
+    type: aws:ec2:Instance
+    properties:
+      ami: ${ubuntuAmi}
+      instanceType: t3.micro
+      keyName: ${keypair.keyName}
+      associatePublicIpAddress: false
+      subnetId: ${publicSubnet1.id}
+      securityGroups:
+        - ${ec2SecurityGroup.id}
+      userData: ${initScript}
+  
+  ec2LaunchConfig:
+    type: aws:ec2:LaunchConfiguration
+    properties:
+      imageId: ${ubuntuAmi}
+      instanceType: t3.micro
+      securityGroups:
+        - ${ec2SecurityGroup.id}
+      keyName: ${keypair.keyName}
+      associatePublicIpAddress: false
+      userData: ${initScript}
+    options:
+      dependsOn:
+        - ${ngw}
+  
+  alb:
+    type: aws:lb:LoadBalancer
+    properties:
+      loadBalancerType: application
+      internal: false
+      securityGroups:
+        - ${albSecurityGroup.id}
+      subnets:
+        - ${publicSubnet1.id}
+        - ${publicSubnet2.id}
+  
+  defaultTargetGroup:
+    type: aws:lb:TargetGroup
+    properties:
+      port: 80
+      protocol: HTTP
+      vpcId: ${vpc.id}
+      healthCheck:
+        path: "/"
+        port: traffic-port
+        healthyThreshold: 5
+        unhealthyThreshold: 2
+        timeout: 2
+        interval: 60
+        matcher: "200"
+
+  ec2AlbHttpListener:
+    type: aws:lb:Listener
+    properties:
+      loadBalancerArn: ${alb.arn}
+      port: 80
+      protocol: HTTP
+      defaultActions:
+        - type: forward
+          targetGroupArn: ${defaultTargetGroup.arn}
+    options:
+      dependsOn:
+        - ${defaultTargetGroup}
+  
+  ec2Cluster:
+    type: aws:autoscaling:Group
+    properties:
+      minSize: ${autoscaleMin}
+      maxSize: ${autoscaleMax}
+      desiredCapacity: ${autoscaleDesired}
+      healthCheckType: EC2
+      launchConfiguration: ${ec2LaunchConfig.name}
+      vpcZoneIdentifiers:
+        - ${privateSubnet1.id}
+        - ${privateSubnet2.id}
+      targetGroupArns:
+        - ${defaultTargetGroup.arn}
+  
+  autoscaleAttachment:
+    type: aws:autoscaling:Attachment
+    properties:
+      autoscalingGroupName: ${ec2Cluster.id}
+      lbTargetGroupArn: ${defaultTargetGroup.arn}
