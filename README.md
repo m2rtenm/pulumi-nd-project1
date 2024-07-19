@@ -11,3 +11,7 @@ curl -fsSL https://get.pulumi.com | sh
 ````
 
 * Configure your [Pulumi user](https://www.pulumi.com/docs/get-started/)
+
+* Install and configure [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+
+* Install and configure [AWS CLI](https://aws.amazon.com/cli/)
